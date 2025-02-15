@@ -9,10 +9,6 @@ from typing import Any, Dict, List, Optional
 
 from langchain_anthropic import ChatAnthropic
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.messages import BaseMessage
-from langchain_core.outputs import ChatResult
-
-# Import the Chat models
 from langchain_openai import ChatOpenAI
 
 # Tenacity for retry logic
@@ -24,26 +20,21 @@ from tenacity import (
 )
 
 from src.models.schemas import ModelProvider
-
-# Local imports
 from src.utils.logging import LoggerMixin, log_execution_time
 
 
 class ModelError(Exception):
     """Base class for model-related errors."""
-
     pass
 
 
 class APIKeyError(ModelError):
     """Raised when there are issues with API keys."""
-
     pass
 
 
 class RateLimitError(ModelError):
     """Raised when rate limits are hit."""
-
     pass
 
 
@@ -62,11 +53,11 @@ class ModelManager(LoggerMixin):
         Initialize the model manager.
 
         Args:
-            openai_api_key: OpenAI API key
-            anthropic_api_key: Anthropic API key
-            default_provider: Default model provider to use
-            max_retries: Maximum number of retries for failed calls
-            timeout: Timeout in seconds for API calls
+            openai_api_key: OpenAI API key.
+            anthropic_api_key: Anthropic API key.
+            default_provider: Default model provider to use.
+            max_retries: Maximum number of retries for failed calls.
+            timeout: Timeout in seconds for API calls.
         """
         self._validate_api_keys(openai_api_key, anthropic_api_key)
 
@@ -81,7 +72,7 @@ class ModelManager(LoggerMixin):
             "anthropic": {"requests_per_min": 50, "tokens_per_min": 100000},
         }
 
-        # Initialize models
+        # Initialize models using the new invoke API.
         self._models: Dict[str, BaseChatModel] = {
             "openai": ChatOpenAI(
                 api_key=openai_api_key,
@@ -111,23 +102,23 @@ class ModelManager(LoggerMixin):
         Check if we're within rate limits.
 
         Args:
-            provider: The provider to check
+            provider: The provider to check.
 
         Raises:
-            RateLimitError: If rate limit would be exceeded
+            RateLimitError: If rate limit would be exceeded.
         """
         now = time.time()
         history = self._call_history[provider]
 
-        # Remove calls older than 60 seconds
+        # Remove calls older than 60 seconds.
         updated_history = [t for t in history if (now - t) <= 60]
         self._call_history[provider] = updated_history
 
-        # Check if we're at the limit
+        # Check if we're at the limit.
         if len(updated_history) >= self._rate_limits[provider]["requests_per_min"]:
             raise RateLimitError(f"Rate limit exceeded for {provider}")
 
-        # Add current call
+        # Add current call.
         updated_history.append(now)
 
     def _handle_rate_limit(self, provider: str) -> None:
@@ -143,9 +134,7 @@ class ModelManager(LoggerMixin):
 
     def switch_provider(self, provider: ModelProvider | str) -> None:
         """Switch to a different model provider."""
-        # If user passed a string, try to map it to a ModelProvider
         if isinstance(provider, str):
-            # Either do a direct check of known strings, or attempt to parse
             provider_lower = provider.lower()
             if provider_lower == "openai":
                 provider = ModelProvider.OPENAI
@@ -178,35 +167,43 @@ class ModelManager(LoggerMixin):
         retry=retry_if_exception_type(RateLimitError),
     )
     @log_execution_time()
-    async def generate(self, messages: List[BaseMessage], **kwargs: Any) -> ChatResult:
+    async def invoke(self, messages: List[Any], **kwargs: Any) -> Any:
         """
-        Generate a response from the current model.
+        Generate a response from the current model using the new invoke API.
 
         Args:
-            messages: List of messages to send
-            **kwargs: Additional arguments to pass to the model
+            messages: List of messages to send (e.g. list of (role, content) tuples).
+            **kwargs: Additional arguments to pass to the model.
 
         Returns:
-            ChatResult containing the generations
+            The AIMessage from the invoked model.
 
         Raises:
-            ModelError: If there's an error generating the response
+            ModelError: If there's an error generating the response.
         """
         provider = self._current_provider.value
         self._handle_rate_limit(provider)
 
         try:
             model = self._models[provider]
-            return await self._call_model_agenerate(model, messages, **kwargs)
+            return await self._call_model_invoke(model, messages, **kwargs)
         except Exception as e:
             self.logger.error(f"Error generating response: {str(e)}")
             raise ModelError(f"Failed to generate response: {str(e)}") from e
 
-    async def _call_model_agenerate(
-        self, model: BaseChatModel, messages: List[BaseMessage], **kwargs: Any
-    ) -> ChatResult:
+    async def _call_model_invoke(
+        self, model: BaseChatModel, messages: List[Any], **kwargs: Any
+    ) -> Any:
         """
-        Helper method so we can patch this method easily in tests
-        without fighting Pydantic's dynamic attribute protections.
+        Helper method to call the model's invoke method.
+
+        Args:
+            model: The model instance.
+            messages: The messages to send.
+            **kwargs: Additional arguments.
+
+        Returns:
+            The AIMessage from the model.
         """
-        return await model.agenerate([messages], **kwargs)
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, lambda: model.invoke(messages, **kwargs))

@@ -11,8 +11,8 @@ class Settings(BaseSettings):
         env_file=".env", env_file_encoding="utf-8", case_sensitive=True, extra="ignore"
     )
 
-    OPENAI_API_KEY: str = Field(..., description="OpenAI API key")
-    ANTHROPIC_API_KEY: str = Field(..., description="Anthropic API key")
+    OPENAI_API_KEY: str = Field(..., description="OpenAI API key", min_length=20)
+    ANTHROPIC_API_KEY: str = Field(..., description="Anthropic API key", min_length=20)
     DEFAULT_MODEL: str = Field(
         default="openai", description="Default model provider to use"
     )
