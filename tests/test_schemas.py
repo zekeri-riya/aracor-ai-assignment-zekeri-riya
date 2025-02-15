@@ -1,4 +1,3 @@
-# tests/test_schemas.py
 """Tests for schema models."""
 
 from datetime import datetime
