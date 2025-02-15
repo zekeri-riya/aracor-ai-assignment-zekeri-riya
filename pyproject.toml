@@ -1,0 +1,82 @@
+# pyproject.toml
+
+[tool.poetry]
+name = "document-analysis-system"
+version = "0.1.0"
+description = "Document analysis system using LangChain"
+authors = ["Your Name <your.email@example.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+langchain = "^0.3.18"
+openai = "^1.63.0"
+anthropic = "^0.45.2"
+python-dotenv = "^1.0.1"
+pydantic = "^2.10.6"
+pydantic-settings = "^2.7.1"
+pypdf = "^5.3.0"
+tiktoken = "^0.9.0"
+fastapi = "^0.115.8"
+python-multipart = "^0.0.20"
+uvicorn = "^0.34.0"
+python-docx = "^1.1.2"
+pytest-asyncio = "^0.25.3"
+langchain-community = "^0.3.17"
+langchain-openai = "^0.3.5"
+langchain-anthropic = "^0.3.7"
+tenacity = "^8.2.3"
+backoff = "^2.2.1"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.4"
+pytest-cov = "^6.0.0"
+black = "^25.1.0"
+isort = "^6.0.0"
+mypy = "^1.15.0"
+pylint = "^3.3.4"
+pre-commit = "^4.1.0"
+pytest-asyncio = "^0.25.3"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+asyncio_mode = "strict"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::UserWarning",
+]
+addopts = "-v --cov=src --cov-report=term-missing"
+
+[tool.black]
+line-length = 88
+target-version = ["py311"]
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+check_untyped_defs = true
+
+[tool.pylint]
+max-line-length = 88
+disable = [
+    "C0111",  # missing-docstring
+    "C0103",  # invalid-name
+    "R0903",  # too-few-public-methods
+]
+good-names = ["i", "j", "k", "ex", "Run", "_", "fp", "id"]
