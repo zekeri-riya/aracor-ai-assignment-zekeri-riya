@@ -20,6 +20,7 @@ from src.utils.logging import LoggerMixin, get_logger, log_execution_time
 
 class SummaryGenerationError(Exception):
     """Raised when there's an error generating summaries."""
+
     pass
 
 
@@ -68,8 +69,12 @@ class SummaryGenerator(LoggerMixin):
         """
         # Explicitly set the logger to DEBUG for this class.
         self.logger = get_logger(self.__class__.__name__, level="DEBUG")
-        self.logger.info("Initializing SummaryGenerator with chunk_size=%d, chunk_overlap=%d, max_concurrent_chunks=%d",
-                         chunk_size, chunk_overlap, max_concurrent_chunks)
+        self.logger.info(
+            "Initializing SummaryGenerator with chunk_size=%d, chunk_overlap=%d, max_concurrent_chunks=%d",
+            chunk_size,
+            chunk_overlap,
+            max_concurrent_chunks,
+        )
         self.model_manager = model_manager
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=chunk_size, chunk_overlap=chunk_overlap, length_function=len
@@ -157,7 +162,9 @@ class SummaryGenerator(LoggerMixin):
             return summaries[0]
 
         combined_text = "\n\n".join(summaries)
-        self.logger.debug("Combined text before prompting for final summary: %.200s", combined_text)
+        self.logger.debug(
+            "Combined text before prompting for final summary: %.200s", combined_text
+        )
 
         template = f"""
             Below are summaries of different sections. Combine them into a single coherent {summary_type.value} summary:
@@ -167,7 +174,9 @@ class SummaryGenerator(LoggerMixin):
             Combined Summary:
         """
         if language and language.lower() != "en":
-            self.logger.debug("Adding language directive to combined summary prompt: %s", language)
+            self.logger.debug(
+                "Adding language directive to combined summary prompt: %s", language
+            )
             template += f"\n\nPlease provide the summary in {language}."
 
         try:
@@ -178,7 +187,9 @@ class SummaryGenerator(LoggerMixin):
                 ]
             )
             self.logger.debug("Created combination prompt: %s", prompt)
-            response = await self.model_manager.generate(prompt.format_messages(text=combined_text))
+            response = await self.model_manager.generate(
+                prompt.format_messages(text=combined_text)
+            )
             combined_summary = response.generations[0][0].message.content
             self.logger.debug("Final combined summary: %.200s", combined_summary)
             return combined_summary
@@ -209,7 +220,9 @@ class SummaryGenerator(LoggerMixin):
         Raises:
             SummaryGenerationError: If generation fails.
         """
-        self.logger.info("Starting summary generation for document: %s", metadata.filename)
+        self.logger.info(
+            "Starting summary generation for document: %s", metadata.filename
+        )
         start_time = datetime.now()
         try:
             # Split text into chunks using the RecursiveCharacterTextSplitter.
@@ -220,26 +233,41 @@ class SummaryGenerator(LoggerMixin):
             partial_summaries = []
             for i in range(0, len(chunks), self.max_concurrent_chunks):
                 batch = chunks[i : i + self.max_concurrent_chunks]
-                self.logger.debug("Processing batch of chunks (indexes %d to %d)", i, i + len(batch) - 1)
+                self.logger.debug(
+                    "Processing batch of chunks (indexes %d to %d)",
+                    i,
+                    i + len(batch) - 1,
+                )
                 chunk_tasks = [
                     self._generate_chunk_summary(chunk, summary_type, language)
                     for chunk in batch
                 ]
-                batch_results = await asyncio.gather(*chunk_tasks, return_exceptions=True)
+                batch_results = await asyncio.gather(
+                    *chunk_tasks, return_exceptions=True
+                )
                 for idx, result in enumerate(batch_results):
                     if isinstance(result, Exception):
                         self.logger.warning("Chunk %d failed: %s", i + idx, result)
                     else:
-                        self.logger.debug("Chunk %d summary generated successfully.", i + idx)
+                        self.logger.debug(
+                            "Chunk %d summary generated successfully.", i + idx
+                        )
                         partial_summaries.append(result)
 
             # Combine partial summaries into a final summary.
-            final_summary = await self._combine_summaries(partial_summaries, summary_type, language)
+            final_summary = await self._combine_summaries(
+                partial_summaries, summary_type, language
+            )
             processing_time = (datetime.now() - start_time).total_seconds()
-            token_count = len(final_summary) // 4  # Rough estimate: 4 characters per token
+            token_count = (
+                len(final_summary) // 4
+            )  # Rough estimate: 4 characters per token
 
-            self.logger.info("Summary generation finished in %.3f seconds with estimated %d tokens",
-                             processing_time, token_count)
+            self.logger.info(
+                "Summary generation finished in %.3f seconds with estimated %d tokens",
+                processing_time,
+                token_count,
+            )
 
             return SummaryResponse(
                 summary=final_summary,
