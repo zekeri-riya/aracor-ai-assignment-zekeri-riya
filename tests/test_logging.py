@@ -1,4 +1,3 @@
-# tests/test_logging.py
 """Tests for logging utilities."""
 
 import logging
