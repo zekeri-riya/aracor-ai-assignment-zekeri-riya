@@ -76,14 +76,14 @@ class ModelManager(LoggerMixin):
         self._models: Dict[str, BaseChatModel] = {
             "openai": ChatOpenAI(
                 api_key=openai_api_key,
-                model="gpt-3.5-turbo",
+                model="gpt-4o-mini",
                 temperature=0,
                 max_retries=max_retries,
                 timeout=timeout,
             ),
             "anthropic": ChatAnthropic(
                 api_key=anthropic_api_key,
-                model="claude-3-sonnet-20240229",
+                model="claude-3-5-sonnet-20240620",
                 temperature=0,
                 max_retries=max_retries,
                 timeout=timeout,
