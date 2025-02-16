@@ -1,10 +1,10 @@
 """Tests for model manager."""
 
 import asyncio
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from langchain_core.messages import BaseMessage, HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage
 
 from src.services.model_manager import (
     APIKeyError,
@@ -61,19 +61,19 @@ class TestModelManager:
             manager.switch_provider("invalid_provider")
 
     @pytest.mark.asyncio
-    async def test_generation(self, manager):
-        """Test successful generation."""
+    async def test_invoke(self, manager):
+        """Test successful invocation."""
         messages = [HumanMessage(content="Hello, how are you?")]
 
-        # Mock the helper method instead of patching .agenerate directly
-        mock_response = MagicMock()
-        mock_response.generations[0][0].text = "I'm doing well, thank you!"
+        # Create mock response
+        mock_response = AIMessage(content="I'm doing well, thank you!")
 
+        # Mock the helper method
         with patch.object(
-            manager, "_call_model_agenerate", return_value=mock_response
+            manager, "_call_model_invoke", return_value=mock_response
         ) as mock_call:
-            response = await manager.generate(messages)
-            assert response.generations[0][0].text == "I'm doing well, thank you!"
+            response = await manager.invoke(messages)
+            assert response.content == "I'm doing well, thank you!"
             mock_call.assert_called_once()
 
     def test_timeout_handling(self, manager):
@@ -98,12 +98,44 @@ class TestModelManager:
 
     @pytest.mark.asyncio
     async def test_error_handling(self, manager):
-        """Test error handling during generation."""
+        """Test error handling during invocation."""
         messages = [HumanMessage(content="Test message")]
 
         with patch.object(
-            manager, "_call_model_agenerate", side_effect=Exception("API Error")
+            manager, "_call_model_invoke", side_effect=Exception("API Error")
         ):
             with pytest.raises(ModelError) as exc_info:
-                await manager.generate(messages)
+                await manager.invoke(messages)
             assert "Failed to generate response" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_rate_limiting(self, manager):
+        """Test rate limiting functionality."""
+        # Set a very low rate limit for testing
+        manager._rate_limits["openai"]["requests_per_min"] = 2
+        
+        messages = [HumanMessage(content="Test message")]
+        mock_response = AIMessage(content="Test response")
+        
+        with patch.object(manager, "_call_model_invoke", return_value=mock_response):
+            # First two calls should work
+            await manager.invoke(messages)
+            await manager.invoke(messages)
+            
+            # Third call should trigger rate limit handling
+            with patch('time.sleep') as mock_sleep:
+                await manager.invoke(messages)
+                mock_sleep.assert_called_with(2)
+
+    def test_model_initialization(self, manager):
+        """Test model initialization with correct configurations."""
+        openai_model = manager._models["openai"]
+        anthropic_model = manager._models["anthropic"]
+
+        assert openai_model.temperature == 0
+        assert openai_model.max_retries == 3
+        assert openai_model.timeout == 30
+
+        assert anthropic_model.temperature == 0
+        assert anthropic_model.max_retries == 3
+        assert anthropic_model.timeout == 30
