@@ -112,16 +112,13 @@ class SummaryGenerator(LoggerMixin):
         """
         try:
             self.logger.debug("Generating summary for chunk (length %d)", len(chunk))
-            self.logger.debug("Chunk content (first 100 chars): %.100s", chunk)
             prompt = self._create_prompt(summary_type, language)
             # Format the prompt by filling in the {text} placeholder.
             formatted_messages = prompt.format_messages(text=chunk)
-            self.logger.debug("Formatted prompt messages: %s", formatted_messages)
 
             # Invoke the model with the formatted messages.
             # (The new API returns an AIMessage with a .content attribute.)
             response = await self.model_manager.invoke(formatted_messages)
-            self.logger.debug("Received response from model: %s", response.content)
 
             return response.content
 
@@ -158,8 +155,7 @@ class SummaryGenerator(LoggerMixin):
             return summaries[0]
 
         combined_text = "\n\n".join(summaries)
-        self.logger.debug("Combined text before final summary prompt (first 200 chars): %.200s", combined_text)
-
+        self.logger.debug("Combined text length: %d", len(combined_text))
         template = (
             f"Below are summaries of different sections. Combine them into a single coherent {summary_type.value} summary:\n\n"
             f"{combined_text}\n\nCombined Summary:"
@@ -174,11 +170,8 @@ class SummaryGenerator(LoggerMixin):
                 ("human", template),
             ]
             prompt = ChatPromptTemplate.from_messages(messages)
-            self.logger.debug("Created combination prompt: %s", prompt)
             formatted_messages = prompt.format_messages()
-            self.logger.debug("Formatted combination prompt messages: %s", formatted_messages)
             response = await self.model_manager.invoke(formatted_messages)
-            self.logger.debug("Final combined summary: %.200s", response.content)
             return response.content
 
         except Exception as e:
@@ -207,13 +200,11 @@ class SummaryGenerator(LoggerMixin):
         Raises:
             SummaryGenerationError: If generation fails.
         """
-        self.logger.info("Starting summary generation for document: %s", metadata.filename)
         start_time = datetime.now()
         try:
             # Split text into chunks.
             chunks = self.text_splitter.split_text(text)
             self.logger.info("Split text into %d chunks", len(chunks))
-            self.logger.debug("Full text to summarize (first 300 chars): %.300s", text)
 
             partial_summaries = []
             # Process chunks in batches to limit concurrent calls.
@@ -239,7 +230,6 @@ class SummaryGenerator(LoggerMixin):
 
             self.logger.info("Summary generation finished in %.3f seconds with estimated %d tokens",
                              processing_time, token_count)
-            self.logger.debug("Final generated summary (first 300 chars): %.300s", final_summary)
 
             return SummaryResponse(
                 summary=final_summary,
