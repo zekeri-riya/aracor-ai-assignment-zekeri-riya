@@ -1,4 +1,3 @@
-# src/api/config.py
 """API configuration and dependency injection."""
 
 from functools import lru_cache

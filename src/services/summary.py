@@ -62,7 +62,9 @@ class SummaryGenerator(LoggerMixin):
         self.logger = get_logger(self.__class__.__name__, level="DEBUG")
         self.logger.info(
             "Initializing SummaryGenerator with chunk_size=%d, chunk_overlap=%d, max_concurrent_chunks=%d",
-            chunk_size, chunk_overlap, max_concurrent_chunks,
+            chunk_size,
+            chunk_overlap,
+            max_concurrent_chunks,
         )
         self.model_manager = model_manager
         self.text_splitter = RecursiveCharacterTextSplitter(
@@ -70,13 +72,15 @@ class SummaryGenerator(LoggerMixin):
         )
         self.max_concurrent_chunks = max_concurrent_chunks
 
-    def _create_prompt(self, summary_type: SummaryType, language: Optional[str] = None) -> ChatPromptTemplate:
+    def _create_prompt(
+        self, summary_type: SummaryType, language: Optional[str] = None
+    ) -> ChatPromptTemplate:
         """Create a ChatPromptTemplate for summary generation.
-        
+
         Args:
             summary_type: Type of summary to generate.
             language: Optional target language.
-        
+
         Returns:
             ChatPromptTemplate.
         """
@@ -84,7 +88,7 @@ class SummaryGenerator(LoggerMixin):
         if language and language.lower() != "en":
             self.logger.debug("Adding language directive to prompt: %s", language)
             template += f"\n\nPlease provide the summary in {language}."
-        
+
         # Using the new prompt style with a list of (role, content) tuples.
         messages = [
             ("system", "You are a proficient summarizer."),
@@ -161,7 +165,9 @@ class SummaryGenerator(LoggerMixin):
             f"{combined_text}\n\nCombined Summary:"
         )
         if language and language.lower() != "en":
-            self.logger.debug("Adding language directive to combined summary prompt: %s", language)
+            self.logger.debug(
+                "Adding language directive to combined summary prompt: %s", language
+            )
             template += f"\n\nPlease provide the summary in {language}."
 
         try:
@@ -210,26 +216,41 @@ class SummaryGenerator(LoggerMixin):
             # Process chunks in batches to limit concurrent calls.
             for i in range(0, len(chunks), self.max_concurrent_chunks):
                 batch = chunks[i : i + self.max_concurrent_chunks]
-                self.logger.debug("Processing batch of chunks (indexes %d to %d)", i, i + len(batch) - 1)
+                self.logger.debug(
+                    "Processing batch of chunks (indexes %d to %d)",
+                    i,
+                    i + len(batch) - 1,
+                )
                 chunk_tasks = [
                     self._generate_chunk_summary(chunk, summary_type, language)
                     for chunk in batch
                 ]
-                batch_results = await asyncio.gather(*chunk_tasks, return_exceptions=True)
+                batch_results = await asyncio.gather(
+                    *chunk_tasks, return_exceptions=True
+                )
                 for idx, result in enumerate(batch_results):
                     if isinstance(result, Exception):
                         self.logger.warning("Chunk %d failed: %s", i + idx, result)
                     else:
-                        self.logger.debug("Chunk %d summary generated successfully.", i + idx)
+                        self.logger.debug(
+                            "Chunk %d summary generated successfully.", i + idx
+                        )
                         partial_summaries.append(result)
 
             # Combine partial summaries into the final summary.
-            final_summary = await self._combine_summaries(partial_summaries, summary_type, language)
+            final_summary = await self._combine_summaries(
+                partial_summaries, summary_type, language
+            )
             processing_time = (datetime.now() - start_time).total_seconds()
-            token_count = len(final_summary) // 4  # Rough estimate: 4 characters per token
+            token_count = (
+                len(final_summary) // 4
+            )  # Rough estimate: 4 characters per token
 
-            self.logger.info("Summary generation finished in %.3f seconds with estimated %d tokens",
-                             processing_time, token_count)
+            self.logger.info(
+                "Summary generation finished in %.3f seconds with estimated %d tokens",
+                processing_time,
+                token_count,
+            )
 
             return SummaryResponse(
                 summary=final_summary,

@@ -7,7 +7,6 @@ from typing import Optional
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 
 from src.api.config import (
     get_document_processor,
@@ -90,12 +89,6 @@ async def analyze_document(
             text, metadata = processor.process_file(file_path)
             logger.info("File processed. Extracted text length: %d", len(text))
             logger.debug("Metadata extracted: %s", metadata)
-
-            logger.info(
-                "Text extraction complete. Generating summary... Full text: %s\nMetadata: %s",
-                text,
-                metadata,
-            )
 
             # Switch to requested model provider
             logger.info("Switching model provider to: %s", model.value)

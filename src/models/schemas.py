@@ -13,7 +13,6 @@ class SummaryType(str, Enum):
     DETAILED = "detailed"
     BULLET_POINTS = "bullet_points"
     OVERVIEW = "overview"
-    ACTION_ITEMS = "action_items"
 
     def get_max_tokens(self) -> int:
         """Get maximum tokens for each summary type."""

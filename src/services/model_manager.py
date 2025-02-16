@@ -25,16 +25,19 @@ from src.utils.logging import LoggerMixin, log_execution_time
 
 class ModelError(Exception):
     """Base class for model-related errors."""
+
     pass
 
 
 class APIKeyError(ModelError):
     """Raised when there are issues with API keys."""
+
     pass
 
 
 class RateLimitError(ModelError):
     """Raised when rate limits are hit."""
+
     pass
 
 
@@ -206,4 +209,6 @@ class ModelManager(LoggerMixin):
             The AIMessage from the model.
         """
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, lambda: model.invoke(messages, **kwargs))
+        return await loop.run_in_executor(
+            None, lambda: model.invoke(messages, **kwargs)
+        )
