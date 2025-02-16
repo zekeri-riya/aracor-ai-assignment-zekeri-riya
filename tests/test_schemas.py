@@ -1,3 +1,4 @@
+# pylint: disable=no-member
 """Tests for schema models."""
 
 from datetime import datetime
