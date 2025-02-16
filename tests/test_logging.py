@@ -113,7 +113,7 @@ class TestExecutionTimeDecorator:
 
     def test_custom_message(self, caplog):
         """Test custom message in time logging."""
-        custom_msg = "Custom execution time: {:.3f}s"
+        custom_msg = "Custom execution time for %s: %.3f seconds"
 
         @log_execution_time(message=custom_msg)
         def test_function():
@@ -122,4 +122,6 @@ class TestExecutionTimeDecorator:
         with caplog.at_level(logging.DEBUG):
             test_function()
 
-        assert "Custom execution time:" in caplog.text
+        assert "Custom execution time" in caplog.text
+        assert "seconds" in caplog.text
+

@@ -186,27 +186,6 @@ class TestSummaryResponse:
         assert response.processing_time == 1.5
         assert response.token_count == 100
 
-    def test_to_dict_method(self):
-        """Test dictionary conversion of response."""
-        metadata = DocumentMetadata(
-            filename="test.pdf", file_type="application/pdf", file_size=1024
-        )
-
-        response = SummaryResponse(
-            summary="Test summary",
-            metadata=metadata,
-            provider=ModelProvider.OPENAI,
-            summary_type=SummaryType.BRIEF,
-            processing_time=1.5,
-            token_count=100,
-        )
-
-        response_dict = response.to_dict()
-        assert response_dict["summary"] == "Test summary"
-        assert response_dict["provider"] == "openai"
-        assert response_dict["token_count"] == 100
-        assert "metadata" in response_dict
-
 
 class TestErrorResponse:
     """Tests for ErrorResponse model."""

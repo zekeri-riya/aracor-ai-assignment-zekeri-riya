@@ -5,6 +5,7 @@ from typing import Optional, Tuple
 
 import docx
 from pypdf import PdfReader
+from pypdf.errors import PdfReadError
 
 from src.models.schemas import DocumentMetadata, ProcessingOptions
 from src.utils.logging import LoggerMixin, log_execution_time
@@ -47,23 +48,27 @@ class DocumentProcessor(LoggerMixin):
             text_content = []
             self.logger.debug("Starting PDF processing for file: %s", file_path)
             with open(file_path, "rb") as f:
-                reader = PdfReader(f, strict=False)
-                for i, page in enumerate(reader.pages):
-                    content = page.extract_text()
-                    if content:
-                        content = content.strip()
-                        text_content.append(content)
-                        self.logger.debug(
-                            "Extracted text from page %d: %.100s",
-                            i + 1,
-                            content
-                        )
-                    else:
-                        self.logger.warning(
-                            "No text found on page %d of %s",
-                            i + 1,
-                            file_path
-                        )
+                try:
+                    reader = PdfReader(f, strict=False)
+                    for i, page in enumerate(reader.pages):
+                        content = page.extract_text()
+                        if content:
+                            content = content.strip()
+                            text_content.append(content)
+                            self.logger.debug(
+                                "Extracted text from page %d: %.100s",
+                                i + 1,
+                                content
+                            )
+                        else:
+                            self.logger.warning(
+                                "No text found on page %d of %s",
+                                i + 1,
+                                file_path
+                            )
+                except PdfReadError as e:
+                    self.logger.error("PDF processing error: %s", str(e))
+                    raise ExtractError(f"Failed to process corrupted PDF: {str(e)}") from e
 
             if not text_content:
                 self.logger.warning("No text content extracted from PDF: %s", file_path)
@@ -89,7 +94,7 @@ class DocumentProcessor(LoggerMixin):
                     reader = PdfReader(f, strict=False)
                     page_count = len(reader.pages)
                 self.logger.debug("PDF page count for %s: %d", file_path, page_count)
-            except (IOError, ValueError) as e:
+            except (IOError, ValueError, PdfReadError) as e:
                 self.logger.warning(
                     "Could not get PDF page count for %s: %s",
                     file_path,
@@ -142,6 +147,10 @@ class DocumentProcessor(LoggerMixin):
             )
             return text, metadata
 
+        except ExtractError as e:
+            self.logger.error("Error processing file %s: %s", file_path, str(e))
+            # Wrap the ExtractError in a ProcessingError to maintain consistency
+            raise ProcessingError(f"Failed to process file: {str(e)}") from e
         except (IOError, ValueError) as e:
             self.logger.error("Error processing file %s: %s", file_path, str(e))
             raise ProcessingError(f"Failed to process file: {str(e)}") from e
