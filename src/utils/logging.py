@@ -7,7 +7,6 @@ import functools
 import logging
 import sys
 import time
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Optional, TypeVar, Union, cast
 
@@ -23,10 +22,6 @@ class LoggerMixin:
     """Mixin to add logging capabilities to any class."""
 
     logger: logging.Logger
-
-    def __init_logger(self) -> None:
-        """Initialize logger for the class."""
-        self.logger = get_logger(self.__class__.__name__)
 
     def __init_subclass__(cls) -> None:
         """Initialize logger when subclass is created."""
@@ -78,6 +73,7 @@ def get_logger(
 
 def setup_logger(
     name: str,
+    *,
     level: Union[str, int] = logging.INFO,
     log_file: Optional[Union[str, Path]] = None,
     file_level: Optional[Union[str, int]] = None,
@@ -111,7 +107,8 @@ def setup_logger(
 
     # Create formatter
     formatter = logging.Formatter(
-        format_string or DEFAULT_FORMAT, date_format or DEFAULT_DATE_FORMAT
+        format_string or DEFAULT_FORMAT,
+        date_format or DEFAULT_DATE_FORMAT
     )
 
     # Console handler
@@ -166,18 +163,24 @@ def log_execution_time(
                 result = func(*args, **kwargs)
                 execution_time = time.perf_counter() - start_time
 
-                log_msg = (
-                    message
-                    or f"{func.__name__} executed in {execution_time:.3f} seconds"
+                # Use % formatting instead of f-strings for logging
+                log_msg = message or "%s executed in %.3f seconds"
+                logger.log(
+                    level,
+                    log_msg if message else log_msg,
+                    func.__name__,
+                    execution_time
                 )
-                logger.log(level, log_msg)
 
                 return result
 
             except Exception as e:
                 execution_time = time.perf_counter() - start_time
                 logger.error(
-                    f"{func.__name__} failed after {execution_time:.3f} seconds: {str(e)}"
+                    "%s failed after %.3f seconds: %s",
+                    func.__name__,
+                    execution_time,
+                    str(e)
                 )
                 raise
 

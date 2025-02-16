@@ -2,30 +2,28 @@
 
 import asyncio
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_core.prompts import ChatPromptTemplate
 
 from src.models.schemas import (
     DocumentMetadata,
-    ModelProvider,
     SummaryResponse,
     SummaryType,
 )
-from src.services.model_manager import ModelError, ModelManager
+from src.services.model_manager import ModelManager
 from src.utils.logging import LoggerMixin, get_logger, log_execution_time
 
 
 class SummaryGenerationError(Exception):
     """Raised when there's an error generating summaries."""
-    pass
 
 
 class SummaryGenerator(LoggerMixin):
     """Generates summaries using different LLM providers (using updated LangChain APIs)."""
 
-    # Template for each summary type (using a simple string template with a {text} placeholder)
+    # Prompt templates for different summary types
     SUMMARY_TEMPLATES = {
         SummaryType.BRIEF: (
             "Provide a brief summary of the following text in 2-3 sentences:\n"
@@ -33,14 +31,12 @@ class SummaryGenerator(LoggerMixin):
             "Brief Summary:"
         ),
         SummaryType.DETAILED: (
-            "Provide a detailed summary of the following text, capturing main points and key details:\n"
-            "{text}\n"
-            "Detailed Summary:"
+            "Provide a detailed summary of the following text, capturing main "
+            "points and key details:\n{text}\nDetailed Summary:"
         ),
         SummaryType.BULLET_POINTS: (
-            "Summarize the key points of the following text in a bullet-point format:\n"
-            "{text}\n"
-            "Key Points:"
+            "Summarize the key points of the following text in a bullet-point "
+            "format:\n{text}\nKey Points:"
         ),
     }
 
@@ -61,7 +57,8 @@ class SummaryGenerator(LoggerMixin):
         """
         self.logger = get_logger(self.__class__.__name__, level="DEBUG")
         self.logger.info(
-            "Initializing SummaryGenerator with chunk_size=%d, chunk_overlap=%d, max_concurrent_chunks=%d",
+            "Initializing SummaryGenerator with chunk_size=%d, chunk_overlap=%d, "
+            "max_concurrent_chunks=%d",
             chunk_size,
             chunk_overlap,
             max_concurrent_chunks,
@@ -89,7 +86,6 @@ class SummaryGenerator(LoggerMixin):
             self.logger.debug("Adding language directive to prompt: %s", language)
             template += f"\n\nPlease provide the summary in {language}."
 
-        # Using the new prompt style with a list of (role, content) tuples.
         messages = [
             ("system", "You are a proficient summarizer."),
             ("human", template),
@@ -117,18 +113,15 @@ class SummaryGenerator(LoggerMixin):
         try:
             self.logger.debug("Generating summary for chunk (length %d)", len(chunk))
             prompt = self._create_prompt(summary_type, language)
-            # Format the prompt by filling in the {text} placeholder.
             formatted_messages = prompt.format_messages(text=chunk)
-
-            # Invoke the model with the formatted messages.
-            # (The new API returns an AIMessage with a .content attribute.)
             response = await self.model_manager.invoke(formatted_messages)
-
             return response.content
 
         except Exception as e:
             self.logger.error("Error generating chunk summary: %s", str(e))
-            raise SummaryGenerationError(f"Failed to generate chunk summary: {str(e)}")
+            raise SummaryGenerationError(
+                f"Failed to generate chunk summary: {str(e)}"
+            ) from e
 
     async def _combine_summaries(
         self,
@@ -161,9 +154,11 @@ class SummaryGenerator(LoggerMixin):
         combined_text = "\n\n".join(summaries)
         self.logger.debug("Combined text length: %d", len(combined_text))
         template = (
-            f"Below are summaries of different sections. Combine them into a single coherent {summary_type.value} summary:\n\n"
+            f"Below are summaries of different sections. "
+            f"Combine them into a single coherent {summary_type.value} summary:\n\n"
             f"{combined_text}\n\nCombined Summary:"
         )
+
         if language and language.lower() != "en":
             self.logger.debug(
                 "Adding language directive to combined summary prompt: %s", language
@@ -182,7 +177,33 @@ class SummaryGenerator(LoggerMixin):
 
         except Exception as e:
             self.logger.error("Error combining summaries: %s", str(e))
-            raise SummaryGenerationError(f"Failed to combine summaries: {str(e)}")
+            raise SummaryGenerationError(
+                f"Failed to combine summaries: {str(e)}"
+            ) from e
+
+    def _process_batch(
+        self,
+        chunk_summaries: List[str],
+        failed_chunks: List[int],
+        batch_results: List[str | Exception],
+        batch_start_idx: int,
+    ) -> None:
+        """Process a batch of chunk summary results.
+
+        Args:
+            chunk_summaries: List to append successful summaries to.
+            failed_chunks: List to append failed chunk indices to.
+            batch_results: Results from the current batch.
+            batch_start_idx: Starting index of the current batch.
+        """
+        for idx, result in enumerate(batch_results):
+            chunk_idx = batch_start_idx + idx
+            if isinstance(result, Exception):
+                self.logger.warning("Chunk %d failed: %s", chunk_idx, result)
+                failed_chunks.append(chunk_idx)
+            else:
+                self.logger.debug("Chunk %d summary generated successfully", chunk_idx)
+                chunk_summaries.append(result)
 
     @log_execution_time()
     async def generate_summary(
@@ -208,12 +229,12 @@ class SummaryGenerator(LoggerMixin):
         """
         start_time = datetime.now()
         try:
-            # Split text into chunks.
             chunks = self.text_splitter.split_text(text)
             self.logger.info("Split text into %d chunks", len(chunks))
 
-            partial_summaries = []
-            # Process chunks in batches to limit concurrent calls.
+            chunk_summaries = []
+            failed_chunks = []
+
             for i in range(0, len(chunks), self.max_concurrent_chunks):
                 batch = chunks[i : i + self.max_concurrent_chunks]
                 self.logger.debug(
@@ -228,23 +249,18 @@ class SummaryGenerator(LoggerMixin):
                 batch_results = await asyncio.gather(
                     *chunk_tasks, return_exceptions=True
                 )
-                for idx, result in enumerate(batch_results):
-                    if isinstance(result, Exception):
-                        self.logger.warning("Chunk %d failed: %s", i + idx, result)
-                    else:
-                        self.logger.debug(
-                            "Chunk %d summary generated successfully.", i + idx
-                        )
-                        partial_summaries.append(result)
+                self._process_batch(chunk_summaries, failed_chunks, batch_results, i)
 
-            # Combine partial summaries into the final summary.
+            if failed_chunks:
+                self.logger.warning(
+                    "Failed to process %d chunks: %s", len(failed_chunks), failed_chunks
+                )
+
             final_summary = await self._combine_summaries(
-                partial_summaries, summary_type, language
+                chunk_summaries, summary_type, language
             )
             processing_time = (datetime.now() - start_time).total_seconds()
-            token_count = (
-                len(final_summary) // 4
-            )  # Rough estimate: 4 characters per token
+            token_count = len(final_summary) // 4  # Rough estimate
 
             self.logger.info(
                 "Summary generation finished in %.3f seconds with estimated %d tokens",
@@ -263,4 +279,4 @@ class SummaryGenerator(LoggerMixin):
 
         except Exception as e:
             self.logger.error("Error generating summary: %s", str(e))
-            raise SummaryGenerationError(f"Failed to generate summary: {str(e)}")
+            raise SummaryGenerationError(f"Failed to generate summary: {str(e)}") from e

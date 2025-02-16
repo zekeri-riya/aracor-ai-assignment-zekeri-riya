@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from langchain_anthropic import ChatAnthropic
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -26,19 +25,13 @@ from src.utils.logging import LoggerMixin, log_execution_time
 class ModelError(Exception):
     """Base class for model-related errors."""
 
-    pass
-
 
 class APIKeyError(ModelError):
     """Raised when there are issues with API keys."""
 
-    pass
-
 
 class RateLimitError(ModelError):
     """Raised when rate limits are hit."""
-
-    pass
 
 
 class ModelManager(LoggerMixin):
@@ -48,6 +41,7 @@ class ModelManager(LoggerMixin):
         self,
         openai_api_key: str,
         anthropic_api_key: str,
+        *,
         default_provider: ModelProvider = ModelProvider.OPENAI,
         max_retries: int = 3,
         timeout: int = 30,
@@ -130,7 +124,8 @@ class ModelManager(LoggerMixin):
             self._check_rate_limit(provider)
         except RateLimitError:
             self.logger.warning(
-                f"Rate limit reached for {provider}, waiting 2s before retrying..."
+                "Rate limit reached for %s, waiting 2s before retrying...",
+                provider
             )
             time.sleep(2)
             self._check_rate_limit(provider)
@@ -150,7 +145,7 @@ class ModelManager(LoggerMixin):
             raise ValueError(f"Unsupported provider type: {provider}")
 
         self._current_provider = provider
-        self.logger.info(f"Switched to provider: {provider.value}")
+        self.logger.info("Switched to provider: %s", provider.value)
 
     def get_current_provider(self) -> ModelProvider:
         """Get the current model provider."""
@@ -191,7 +186,7 @@ class ModelManager(LoggerMixin):
             model = self._models[provider]
             return await self._call_model_invoke(model, messages, **kwargs)
         except Exception as e:
-            self.logger.error(f"Error generating response: {str(e)}")
+            self.logger.error("Error generating response: %s", str(e))
             raise ModelError(f"Failed to generate response: {str(e)}") from e
 
     async def _call_model_invoke(

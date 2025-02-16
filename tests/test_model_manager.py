@@ -1,8 +1,7 @@
 """Tests for model manager."""
 
-import asyncio
 import time
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage
@@ -14,6 +13,10 @@ from src.services.model_manager import (
     ModelProvider,
     RateLimitError,
 )
+
+
+# Since we're testing implementation details, we need to access protected members
+# pylint: disable=protected-access
 
 
 class TestModelManager:
@@ -65,11 +68,8 @@ class TestModelManager:
     async def test_invoke(self, manager):
         """Test successful invocation."""
         messages = [HumanMessage(content="Hello, how are you?")]
-
-        # Create mock response
         mock_response = AIMessage(content="I'm doing well, thank you!")
 
-        # Mock the helper method
         with patch.object(
             manager, "_call_model_invoke", return_value=mock_response
         ) as mock_call:
@@ -81,7 +81,6 @@ class TestModelManager:
         """Test timeout configuration."""
         assert manager.timeout == 30
 
-        # Create manager with custom timeout
         custom_manager = ModelManager(
             openai_api_key="sk-test-key-openai-123456789",
             anthropic_api_key="sk-test-key-anthropic-123456789",
@@ -112,24 +111,23 @@ class TestModelManager:
     @pytest.mark.asyncio
     async def test_rate_limiting(self, manager):
         """Test rate limiting functionality."""
-        # For this test, set a low rate limit.
-        manager._rate_limits["openai"]["requests_per_min"] = 1
         messages = [HumanMessage(content="Test message")]
         mock_response = AIMessage(content="Test response")
 
-        # Patch time.sleep so that we can simulate the waiting behavior.
-        # Here, we simulate that when sleep is called, we clear the call history
-        # to allow the next invocation to proceed.
+        def clear_history(*args):
+            manager._call_history["openai"].clear()
+
         with (
             patch.object(manager, "_call_model_invoke", return_value=mock_response),
-            patch(
-                "time.sleep",
-                side_effect=lambda s: manager._call_history["openai"].clear(),
-            ) as mock_sleep,
+            patch("time.sleep", side_effect=clear_history) as mock_sleep,
         ):
-            # First call should work.
+            # Set low rate limit for testing
+            manager._rate_limits["openai"]["requests_per_min"] = 1
+
+            # First call should work
             await manager.invoke(messages)
-            # Second call should trigger the rate limit, call sleep, then succeed.
+
+            # Second call should trigger rate limit, call sleep, then succeed
             response = await manager.invoke(messages)
             assert response.content == "Test response"
             mock_sleep.assert_called_with(2)
@@ -137,12 +135,9 @@ class TestModelManager:
     def test_rate_limit_check(self, manager):
         """Test the rate limit checking logic."""
         provider = "openai"
-
-        # Reset call history
-        manager._call_history[provider] = []
-
-        # Add some test calls
         current_time = time.time()
+
+        # Set up test calls
         test_calls = [
             current_time - 70,  # Old call that should be removed
             current_time - 30,  # Recent call that should be kept
@@ -151,15 +146,16 @@ class TestModelManager:
         manager._call_history[provider] = test_calls.copy()
 
         try:
-            # This should clean up old calls and add a new one
+            # Test cleanup and new call addition
             manager._check_rate_limit(provider)
-            # After cleanup, we should have 3 calls (2 recent + 1 new)
+
+            # Check recent calls (should be 2 recent + 1 new)
             recent_calls = [
                 t for t in manager._call_history[provider] if t > current_time - 60
             ]
             assert len(recent_calls) == 3
-            # Verify all remaining calls are recent
             assert all(t > current_time - 60 for t in recent_calls)
+
         except RateLimitError:
-            # It's okay if we hit the rate limit, we just want to verify the cleanup
+            # Rate limit hit is acceptable, we're testing cleanup
             pass
