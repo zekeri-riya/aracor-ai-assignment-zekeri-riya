@@ -1,7 +1,7 @@
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -99,12 +99,13 @@ class DocumentRequest(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
     @model_validator(mode="after")
-    def validate_path(self) -> "DocumentRequest":
+    def validate_path(self) -> Self:
         """Validate that the path exists and is a file."""
-        if not self.path.exists():
-            raise ValueError(f"File does not exist: {self.path}")
-        if not self.path.is_file():
-            raise ValueError(f"Path is not a file: {self.path}")
+        path_obj = Path(str(self.path))
+        if not path_obj.exists():
+            raise ValueError(f"File does not exist: {path_obj}")
+        if not path_obj.is_file():
+            raise ValueError(f"Path is not a file: {path_obj}")
         return self
 
 
@@ -122,11 +123,16 @@ class SummaryResponse(BaseModel):
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert response to dictionary format."""
+        meta_dict = (
+            self.metadata.model_dump()
+            if hasattr(self.metadata, 'model_dump')
+            else {}
+        )
         return {
             "summary": self.summary,
-            "metadata": self.metadata.model_dump(),
-            "provider": self.provider.value,
-            "summary_type": self.summary_type.value,
+            "metadata": meta_dict,
+            "provider": str(self.provider),
+            "summary_type": str(self.summary_type),
             "processing_time": self.processing_time,
             "token_count": self.token_count,
         }

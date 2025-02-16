@@ -1,10 +1,7 @@
 """Document processor implementation for handling different file types."""
 
-import logging
-import mimetypes
-import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Optional, Tuple
 
 import docx
 from pypdf import PdfReader
@@ -16,19 +13,13 @@ from src.utils.logging import LoggerMixin, log_execution_time
 class ProcessingError(Exception):
     """Base class for document processing errors."""
 
-    pass
-
 
 class FileTypeError(ProcessingError):
     """Error raised when file type is not supported."""
 
-    pass
-
 
 class ExtractError(ProcessingError):
     """Error raised when text extraction fails."""
-
-    pass
 
 
 class DocumentProcessor(LoggerMixin):
@@ -37,14 +28,17 @@ class DocumentProcessor(LoggerMixin):
     SUPPORTED_TYPES = {
         ".pdf": "application/pdf",
         ".txt": "text/plain",
-        ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ".docx": (
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        ),
     }
 
     def __init__(self, options: Optional[ProcessingOptions] = None):
         """Initialize document processor."""
         self.options = options or ProcessingOptions()
         self.logger.info(
-            "Initialized DocumentProcessor with options: %s", self.options.model_dump()
+            "Initialized DocumentProcessor with options: %s",
+            self.options.model_dump()
         )
 
     def _process_pdf(self, file_path: Path) -> str:
@@ -60,11 +54,15 @@ class DocumentProcessor(LoggerMixin):
                         content = content.strip()
                         text_content.append(content)
                         self.logger.debug(
-                            "Extracted text from page %d: %.100s", i + 1, content
+                            "Extracted text from page %d: %.100s",
+                            i + 1,
+                            content
                         )
                     else:
                         self.logger.warning(
-                            "No text found on page %d of %s", i + 1, file_path
+                            "No text found on page %d of %s",
+                            i + 1,
+                            file_path
                         )
 
             if not text_content:
@@ -76,7 +74,7 @@ class DocumentProcessor(LoggerMixin):
                 len(final_text),
             )
             return final_text
-        except Exception as e:
+        except (IOError, ValueError) as e:
             self.logger.error("PDF processing error: %s", str(e))
             raise ExtractError(f"Failed to extract text from PDF: {str(e)}") from e
 
@@ -91,9 +89,11 @@ class DocumentProcessor(LoggerMixin):
                     reader = PdfReader(f, strict=False)
                     page_count = len(reader.pages)
                 self.logger.debug("PDF page count for %s: %d", file_path, page_count)
-            except Exception as e:
+            except (IOError, ValueError) as e:
                 self.logger.warning(
-                    "Could not get PDF page count for %s: %s", file_path, str(e)
+                    "Could not get PDF page count for %s: %s",
+                    file_path,
+                    str(e)
                 )
 
         metadata = DocumentMetadata(
@@ -106,7 +106,7 @@ class DocumentProcessor(LoggerMixin):
         return metadata
 
     @log_execution_time()
-    def process_file(self, file_path: Path) -> tuple[str, DocumentMetadata]:
+    def process_file(self, file_path: Path) -> Tuple[str, DocumentMetadata]:
         """Process a file and extract its text content with metadata."""
         self.logger.info("Processing file: %s", file_path)
         if not file_path.exists():
@@ -129,20 +129,20 @@ class DocumentProcessor(LoggerMixin):
                 text = self._process_pdf(file_path)
             elif file_type == "text/plain":
                 text = self._process_txt(file_path)
-            elif (
-                file_type
-                == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            ):
+            elif file_type == self.SUPPORTED_TYPES[".docx"]:
                 text = self._process_docx(file_path)
             else:
                 self.logger.error("No processor available for file type: %s", file_type)
                 raise FileTypeError(f"No processor for file type: {file_type}")
 
             self.logger.info("Successfully processed file: %s", file_path)
-            self.logger.debug("Extracted text preview (first 200 chars): %.200s", text)
+            self.logger.debug(
+                "Extracted text preview (first 200 chars): %.200s",
+                text
+            )
             return text, metadata
 
-        except Exception as e:
+        except (IOError, ValueError) as e:
             self.logger.error("Error processing file %s: %s", file_path, str(e))
             raise ProcessingError(f"Failed to process file: {str(e)}") from e
 
@@ -151,7 +151,9 @@ class DocumentProcessor(LoggerMixin):
         extension = file_path.suffix.lower()
         file_type = self.SUPPORTED_TYPES.get(extension, "application/octet-stream")
         self.logger.debug(
-            "File extension: %s mapped to MIME type: %s", extension, file_type
+            "File extension: %s mapped to MIME type: %s",
+            extension,
+            file_type
         )
         return file_type
 
@@ -161,7 +163,7 @@ class DocumentProcessor(LoggerMixin):
             text = file_path.read_text(encoding="utf-8")
             self.logger.debug("Extracted text from TXT file (length %d)", len(text))
             return text
-        except Exception as e:
+        except IOError as e:
             self.logger.error("Text file processing error: %s", str(e))
             raise ExtractError(f"Failed to read text file: {str(e)}") from e
 
@@ -171,14 +173,17 @@ class DocumentProcessor(LoggerMixin):
             self.logger.debug("Starting DOCX processing for file: %s", file_path)
             doc = docx.Document(file_path)
             paragraphs = [
-                paragraph.text for paragraph in doc.paragraphs if paragraph.text.strip()
+                paragraph.text
+                for paragraph in doc.paragraphs
+                if paragraph.text.strip()
             ]
             text = "\n".join(paragraphs)
             self.logger.info("Extracted %d paragraphs from DOCX file", len(paragraphs))
             self.logger.debug(
-                "DOCX extracted text preview (first 200 chars): %.200s", text
+                "DOCX extracted text preview (first 200 chars): %.200s",
+                text
             )
             return text
-        except Exception as e:
+        except (IOError, ValueError) as e:
             self.logger.error("DOCX processing error: %s", str(e))
             raise ExtractError(f"Failed to extract text from DOCX: {str(e)}") from e
