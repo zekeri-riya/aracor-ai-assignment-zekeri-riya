@@ -124,8 +124,7 @@ class ModelManager(LoggerMixin):
             self._check_rate_limit(provider)
         except RateLimitError:
             self.logger.warning(
-                "Rate limit reached for %s, waiting 2s before retrying...",
-                provider
+                "Rate limit reached for %s, waiting 2s before retrying...", provider
             )
             time.sleep(2)
             self._check_rate_limit(provider)

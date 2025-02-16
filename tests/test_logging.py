@@ -124,4 +124,3 @@ class TestExecutionTimeDecorator:
 
         assert "Custom execution time" in caplog.text
         assert "seconds" in caplog.text
-

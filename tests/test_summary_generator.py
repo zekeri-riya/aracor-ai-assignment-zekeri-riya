@@ -52,9 +52,7 @@ class TestSummaryGenerator:
         generator.model_manager.invoke.return_value = mock_response
 
         response = await generator.generate_summary(
-            text,
-            sample_metadata,
-            summary_type=SummaryType.BRIEF
+            text, sample_metadata, summary_type=SummaryType.BRIEF
         )
 
         assert response.summary == "Brief summary of the test document."
@@ -77,9 +75,7 @@ class TestSummaryGenerator:
         generator.model_manager.invoke.return_value = mock_response
 
         response = await generator.generate_summary(
-            text,
-            sample_metadata,
-            summary_type=SummaryType.DETAILED
+            text, sample_metadata, summary_type=SummaryType.DETAILED
         )
 
         assert "Detailed" in response.summary
@@ -96,9 +92,7 @@ class TestSummaryGenerator:
         generator.model_manager.invoke.return_value = mock_response
 
         response = await generator.generate_summary(
-            text,
-            sample_metadata,
-            summary_type=SummaryType.BULLET_POINTS
+            text, sample_metadata, summary_type=SummaryType.BULLET_POINTS
         )
 
         assert "•" in response.summary
@@ -159,9 +153,7 @@ class TestSummaryGenerator:
         generator.model_manager.invoke.return_value = mock_response
 
         response = await generator.generate_summary(
-            text,
-            sample_metadata,
-            language="es"
+            text, sample_metadata, language="es"
         )
 
         assert response.summary == "Resumen en español."

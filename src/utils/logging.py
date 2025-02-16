@@ -107,8 +107,7 @@ def setup_logger(
 
     # Create formatter
     formatter = logging.Formatter(
-        format_string or DEFAULT_FORMAT,
-        date_format or DEFAULT_DATE_FORMAT
+        format_string or DEFAULT_FORMAT, date_format or DEFAULT_DATE_FORMAT
     )
 
     # Console handler
@@ -169,7 +168,7 @@ def log_execution_time(
                     level,
                     log_msg if message else log_msg,
                     func.__name__,
-                    execution_time
+                    execution_time,
                 )
 
                 return result
@@ -180,7 +179,7 @@ def log_execution_time(
                     "%s failed after %.3f seconds: %s",
                     func.__name__,
                     execution_time,
-                    str(e)
+                    str(e),
                 )
                 raise
 

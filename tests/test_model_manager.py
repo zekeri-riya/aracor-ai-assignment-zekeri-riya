@@ -14,7 +14,6 @@ from src.services.model_manager import (
     RateLimitError,
 )
 
-
 # Since we're testing implementation details, we need to access protected members
 # pylint: disable=protected-access
 

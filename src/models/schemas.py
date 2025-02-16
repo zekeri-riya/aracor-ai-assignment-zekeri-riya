@@ -13,6 +13,10 @@ class SummaryType(str, Enum):
     DETAILED = "detailed"
     BULLET_POINTS = "bullet_points"
 
+    def __str__(self) -> str:
+        """Return the value instead of enum name for string representation."""
+        return self.value
+
     def get_max_tokens(self) -> int:
         """Get maximum tokens for each summary type."""
         return {self.BRIEF: 150, self.DETAILED: 500, self.BULLET_POINTS: 300}[self]
@@ -23,6 +27,10 @@ class ModelProvider(str, Enum):
 
     OPENAI = "openai"
     ANTHROPIC = "anthropic"
+
+    def __str__(self) -> str:
+        """Return the value instead of enum name for string representation."""
+        return self.value
 
     def get_default_model(self) -> str:
         """Get default model for each provider."""
@@ -123,9 +131,7 @@ class SummaryResponse(BaseModel):
     def to_dict(self) -> Dict[str, Any]:
         """Convert response to dictionary format."""
         meta_dict = (
-            self.metadata.model_dump()
-            if hasattr(self.metadata, 'model_dump')
-            else {}
+            self.metadata.model_dump() if hasattr(self.metadata, "model_dump") else {}
         )
         return {
             "summary": self.summary,

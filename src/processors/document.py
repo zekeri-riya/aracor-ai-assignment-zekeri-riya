@@ -38,8 +38,7 @@ class DocumentProcessor(LoggerMixin):
         """Initialize document processor."""
         self.options = options or ProcessingOptions()
         self.logger.info(
-            "Initialized DocumentProcessor with options: %s",
-            self.options.model_dump()
+            "Initialized DocumentProcessor with options: %s", self.options.model_dump()
         )
 
     def _process_pdf(self, file_path: Path) -> str:
@@ -56,19 +55,17 @@ class DocumentProcessor(LoggerMixin):
                             content = content.strip()
                             text_content.append(content)
                             self.logger.debug(
-                                "Extracted text from page %d: %.100s",
-                                i + 1,
-                                content
+                                "Extracted text from page %d: %.100s", i + 1, content
                             )
                         else:
                             self.logger.warning(
-                                "No text found on page %d of %s",
-                                i + 1,
-                                file_path
+                                "No text found on page %d of %s", i + 1, file_path
                             )
                 except PdfReadError as e:
                     self.logger.error("PDF processing error: %s", str(e))
-                    raise ExtractError(f"Failed to process corrupted PDF: {str(e)}") from e
+                    raise ExtractError(
+                        f"Failed to process corrupted PDF: {str(e)}"
+                    ) from e
 
             if not text_content:
                 self.logger.warning("No text content extracted from PDF: %s", file_path)
@@ -96,9 +93,7 @@ class DocumentProcessor(LoggerMixin):
                 self.logger.debug("PDF page count for %s: %d", file_path, page_count)
             except (IOError, ValueError, PdfReadError) as e:
                 self.logger.warning(
-                    "Could not get PDF page count for %s: %s",
-                    file_path,
-                    str(e)
+                    "Could not get PDF page count for %s: %s", file_path, str(e)
                 )
 
         metadata = DocumentMetadata(
@@ -141,10 +136,7 @@ class DocumentProcessor(LoggerMixin):
                 raise FileTypeError(f"No processor for file type: {file_type}")
 
             self.logger.info("Successfully processed file: %s", file_path)
-            self.logger.debug(
-                "Extracted text preview (first 200 chars): %.200s",
-                text
-            )
+            self.logger.debug("Extracted text preview (first 200 chars): %.200s", text)
             return text, metadata
 
         except ExtractError as e:
@@ -160,9 +152,7 @@ class DocumentProcessor(LoggerMixin):
         extension = file_path.suffix.lower()
         file_type = self.SUPPORTED_TYPES.get(extension, "application/octet-stream")
         self.logger.debug(
-            "File extension: %s mapped to MIME type: %s",
-            extension,
-            file_type
+            "File extension: %s mapped to MIME type: %s", extension, file_type
         )
         return file_type
 
@@ -182,15 +172,12 @@ class DocumentProcessor(LoggerMixin):
             self.logger.debug("Starting DOCX processing for file: %s", file_path)
             doc = docx.Document(file_path)
             paragraphs = [
-                paragraph.text
-                for paragraph in doc.paragraphs
-                if paragraph.text.strip()
+                paragraph.text for paragraph in doc.paragraphs if paragraph.text.strip()
             ]
             text = "\n".join(paragraphs)
             self.logger.info("Extracted %d paragraphs from DOCX file", len(paragraphs))
             self.logger.debug(
-                "DOCX extracted text preview (first 200 chars): %.200s",
-                text
+                "DOCX extracted text preview (first 200 chars): %.200s", text
             )
             return text
         except (IOError, ValueError) as e:
